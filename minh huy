@@ -1,0 +1,191 @@
+using QLSP.entities;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Data.Entity.Validation;
+using System.Drawing;
+using System.Drawing.Text;
+using System.Linq;
+using System.Reflection;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Xml.Linq;
+
+namespace QLSP
+{
+    public partial class frmQLSP : Form
+    {
+        public frmQLSP()
+        {
+            InitializeComponent();
+        }
+
+        private void frmQLSP_Load(object sender, EventArgs e)
+        {
+            SetupDataGridView();
+            LoadLoaiSP();
+            LoadSanPham();
+        }
+        private void SetupDataGridView()
+        {
+            dvgqlsp.AutoGenerateColumns = false;
+
+            DataGridViewTextBoxColumn colMaSP = new DataGridViewTextBoxColumn();
+            colMaSP.DataPropertyName = "MaSP";
+            colMaSP.HeaderText = "Mã Sản Phẩm";
+            dvgqlsp.Columns.Add(colMaSP);
+
+            DataGridViewTextBoxColumn colTenSP = new DataGridViewTextBoxColumn();
+            colTenSP.DataPropertyName = "TenSP";
+            colTenSP.HeaderText = "Tên Sản Phẩm";
+            dvgqlsp.Columns.Add(colTenSP);
+
+            DataGridViewTextBoxColumn colNgayNhap = new DataGridViewTextBoxColumn();
+            colNgayNhap.DataPropertyName = "Ngaynhap";
+            colNgayNhap.HeaderText = "Ngày Nhập";
+            dvgqlsp.Columns.Add(colNgayNhap);
+
+            DataGridViewTextBoxColumn colLoaiSP = new DataGridViewTextBoxColumn();
+            colLoaiSP.DataPropertyName = "MaLoai";
+            colLoaiSP.HeaderText = "Loại Sản Phẩm";
+            dvgqlsp.Columns.Add(colLoaiSP);
+        }
+        private void LoadLoaiSP()
+        {
+            using (var context = new entities.Model1())
+            {
+                var loaiSPs = context.LoaiSP.ToList();
+                cboLoaiSP.DataSource = loaiSPs;
+                cboLoaiSP.DisplayMember = "TenLoai";
+                cboLoaiSP.ValueMember = "MaLoai";
+            }
+        }
+        private void LoadSanPham()
+        {
+            using (var context = new entities.Model1())
+            {
+                var sanPhams = context.SanPham.ToList();
+                dvgqlsp.DataSource = sanPhams;
+            }
+        }
+        private void btnthem_Click(object sender, EventArgs e)
+        {
+            using (var context = new entities.Model1())
+            {
+                // Kiểm tra mã sản phẩm không trống và không trùng lặp
+                if (string.IsNullOrEmpty(txtma.Text))
+                {
+                    MessageBox.Show("Vui lòng nhập mã sản phẩm.");
+                    return;
+                }
+
+                if (context.SanPham.Any(sp => sp.MaSP == txtma.Text))
+                {
+                    MessageBox.Show("Mã sản phẩm đã tồn tại.");
+                    return;
+                }
+
+                // Kiểm tra tên sản phẩm
+                if (string.IsNullOrEmpty(txtten.Text))
+                {
+                    MessageBox.Show("Vui lòng nhập tên sản phẩm.");
+                    return;
+                }
+
+                // Kiểm tra và chuyển đổi giá trị ngày nhập
+                DateTime ngayNhap;
+                if (!DateTime.TryParse(dateTime.Text, out ngayNhap))
+                {
+                    MessageBox.Show("Ngày nhập không hợp lệ.");
+                    return;
+                }
+
+                // Tạo sản phẩm mới và thêm vào cơ sở dữ liệu
+                var newSanPham = new SanPham
+                {
+                    MaSP = txtma.Text,
+                    TenSP = txtten.Text,
+                    NgayNhap = ngayNhap,
+                    MaLoai = cboLoaiSP.SelectedValue.ToString()
+                };
+
+                context.SanPham.Add(newSanPham);
+                context.SaveChanges();
+                LoadSanPham();
+
+            }
+        }
+
+            private void btnsua_Click(object sender, EventArgs e)
+            {
+                if (dvgqlsp.SelectedRows.Count == 0)
+                {
+                    MessageBox.Show("Vui lòng chọn sản phẩm để sửa.");
+                    return;
+                }
+
+                using (var context = new entities.Model1())
+                {
+                    var maSP = txtma.Text; // Lấy mã sản phẩm từ ô nhập liệu
+                    var sanPham = context.SanPham.FirstOrDefault(sp => sp.MaSP == maSP);
+                    if (sanPham != null)
+                    {
+                        // Kiểm tra tính hợp lệ của các trường
+                        if (string.IsNullOrEmpty(txtten.Text) || cboLoaiSP.SelectedValue == null)
+                        {
+                            MessageBox.Show("Vui lòng điền đầy đủ thông tin.");
+                            return;
+                        }
+
+                        // Kiểm tra và chuyển đổi giá trị ngày nhập
+                        DateTime ngayNhap;
+                        if (!DateTime.TryParse(dateTime.Text, out ngayNhap))
+                        {
+                            MessageBox.Show("Ngày nhập không hợp lệ.");
+                            return;
+                        }
+
+                        // Cập nhật thông tin sản phẩm
+                        sanPham.TenSP = txtten.Text;
+                        sanPham.NgayNhap = ngayNhap;
+                        sanPham.MaLoai = cboLoaiSP.SelectedValue.ToString();
+                        context.SaveChanges();
+                        LoadSanPham(); // Tải lại dữ liệu sau khi sửa
+                    }
+                    else
+                    {
+                        MessageBox.Show("Không tìm thấy sản phẩm để sửa.");
+                    }
+                }
+            }
+            private void btnxoa_Click(object sender, EventArgs e)
+            {
+                if (dvgqlsp.SelectedRows.Count == 0)
+                {
+                    MessageBox.Show("Vui lòng chọn sản phẩm để xóa.");
+                    return;
+                }
+
+                // Xác nhận trước khi xóa
+                DialogResult confirmResult = MessageBox.Show("Bạn có chắc chắn muốn xóa sản phẩm này?", "Xác nhận xóa", MessageBoxButtons.YesNo);
+                if (confirmResult == DialogResult.Yes)
+                {
+                    using (var context = new entities.Model1())
+                    {
+                        foreach (DataGridViewRow row in dvgqlsp.SelectedRows)
+                        {
+                            var maSP = row.Cells["MaSP"].Value.ToString();
+                            var sanPham = context.SanPham.FirstOrDefault(sp => sp.MaSP == maSP);
+                            if (sanPham != null)
+                            {
+                                context.SanPham.Remove(sanPham); // Xóa sản phẩm
+                            }
+                        }
+                        context.SaveChanges();
+                        LoadSanPham(); // Tải lại dữ liệu sau khi xóa
+                    }
+                }
+            } } } 
